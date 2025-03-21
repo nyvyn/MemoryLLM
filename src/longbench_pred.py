@@ -279,8 +279,8 @@ def load_model_and_tokenizer(path, model_name, device):
 if __name__ == '__main__':
     args = parse_args()
     seed_everything(args.seed)
-    model2path = json.load(open("longbench_config/model2path.json", "r"))
-    model2maxlen = json.load(open("longbench_config/model2maxlen.json", "r"))
+    model2path = json.load(open("../longbench_config/model2path.json", "r"))
+    model2maxlen = json.load(open("../longbench_config/model2maxlen.json", "r"))
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model_name = args.model
     # define your model
@@ -304,8 +304,8 @@ if __name__ == '__main__':
             datasets = [args.dataset]
          
     # we design specific prompt format and max generation length for each task, feel free to modify them to optimize model output
-    dataset2prompt = json.load(open("longbench_config/dataset2prompt.json", "r"))
-    dataset2maxlen = json.load(open("longbench_config/dataset2maxlen.json", "r"))
+    dataset2prompt = json.load(open("../longbench_config/dataset2prompt.json", "r"))
+    dataset2maxlen = json.load(open("../longbench_config/dataset2maxlen.json", "r"))
     # predict on each dataset
     if not os.path.exists(f"longbench/pred_seed{args.seed}"):
         os.makedirs(f"longbench/pred_seed{args.seed}")

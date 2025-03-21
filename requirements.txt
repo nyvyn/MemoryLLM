@@ -7,10 +7,10 @@ packaging
 pytorch_lightning==2.2.2
 PyYAML
 tqdm
-SentencePiece
-transformers==4.40.0
-deepspeed==0.14.1
-torch==2.2.2
+sentencepiece==0.2.0
+transformers==4.50.0
+deepspeed==0.16.4
+torch==2.6.0
 peft==0.10.0
 numpy
 tensorboard

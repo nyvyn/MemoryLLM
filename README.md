@@ -46,17 +46,18 @@ git clone git@github.com:wangyu-ustc/MemoryLLM.git
 cd MemoryLLM
 ```
 
-Then to load `MPlus-8B`, please use the following code: 
+Then to load `MPlus-8B`, please use the following code:
+
 ```python
 import torch
 from transformers import AutoTokenizer
-from modeling_mplus import MPlus
+from src.modeling_mplus import MPlus
 
 # load the model mplus-8b (currently we only have the pretrained version)
 model = MPlus.from_pretrained("YuWangX/mplus-8b", attn_implementation="flash_attention_2", torch_dtype=torch.bfloat16)
 tokenizer = AutoTokenizer.from_pretrained("YuWangX/mplus-8b")
-model = model.to(torch.bfloat16) # need to call it again to cast the `inv_freq` in rotary_emb to bfloat16 as well
-model.put_ltm_to_numpy() # We include ltm as modules so that it can be uploaded to huggingface, but for inference we need to put ltm on CPU and cast ltm_ags to numpy. 
+model = model.to(torch.bfloat16)  # need to call it again to cast the `inv_freq` in rotary_emb to bfloat16 as well
+model.put_ltm_to_numpy()  # We include ltm as modules so that it can be uploaded to huggingface, but for inference we need to put ltm on CPU and cast ltm_ags to numpy. 
 model = model.cuda()
 # After this, the usage of MPlus is the same as MemoryLLM-8B, please check "How to use the model" below. 
 ```
