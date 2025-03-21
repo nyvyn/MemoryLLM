@@ -29,6 +29,7 @@ from torch.nn import BCEWithLogitsLoss, CrossEntropyLoss, MSELoss
 
 from transformers.activations import ACT2FN
 from transformers.cache_utils import Cache, DynamicCache, StaticCache
+from transformers import GenerationMixin
 from transformers.modeling_attn_mask_utils import AttentionMaskConverter
 from transformers.modeling_flash_attention_utils import _flash_attention_forward
 from transformers.modeling_outputs import (
@@ -947,7 +948,7 @@ class LlamaDecoderLayer(nn.Module):
         hidden_states = self.input_layernorm(hidden_states)
 
         # Self Attention
-        hidden_states, self_attn_weights, present_key_value, retriever_weights, encoder_retriever_weights = self.self_attn(
+        attn_outputs = self.self_attn(
             hidden_states=hidden_states,
             attention_mask=attention_mask,
             position_ids=position_ids,
@@ -960,6 +961,11 @@ class LlamaDecoderLayer(nn.Module):
             encoder_query_indices=encoder_query_indices,
             **kwargs,
         )
+        if len(attn_outputs) == 3:
+            hidden_states, self_attn_weights, present_key_value = attn_outputs
+            retriever_weights = None
+        else:
+            hidden_states, self_attn_weights, present_key_value, retriever_weights = attn_outputs
         hidden_states = residual + hidden_states
 
         # Fully Connected
@@ -979,7 +985,7 @@ class LlamaDecoderLayer(nn.Module):
         if encoder_query_indices is None:
             outputs += (retriever_weights, )
         else:
-            outputs += (retriever_weights, encoder_retriever_weights)
+            outputs += (retriever_weights, None)
 
         return outputs
 
@@ -1172,13 +1178,8 @@ class LlamaModel(LlamaPreTrainedModel):
             inputs_embeds = self.embed_tokens(input_ids)
 
         return_legacy_cache = False
-        if use_cache and not isinstance(past_key_values, Cache):  # kept for BC (non `Cache` `past_key_values` inputs)
-            return_legacy_cache = True
-            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
-            logger.warning_once(
-                "We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. "
-                "Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)"
-            )
+        if use_cache and not isinstance(past_key_values, Cache):  # Ensure past_key_values is a Cache object
+            past_key_values = DynamicCache()
 
         if cache_position is None:
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
@@ -1334,7 +1335,7 @@ class LlamaModel(LlamaPreTrainedModel):
         return causal_mask
 
 
-class LlamaForCausalLM(LlamaPreTrainedModel):
+class LlamaForCausalLM(LlamaPreTrainedModel, GenerationMixin):
     _tied_weights_keys = ["lm_head.weight"]
 
     def __init__(self, config):
@@ -2261,13 +2262,8 @@ class MPlus(LlamaForCausalLM):
             inputs_embeds = self.model.embed_tokens(input_ids)
 
         return_legacy_cache = False
-        if use_cache and not isinstance(past_key_values, Cache):  # kept for BC (non `Cache` `past_key_values` inputs)
-            return_legacy_cache = True
-            past_key_values = DynamicCache.from_legacy_cache(past_key_values)
-            logger.warning_once(
-                "We detected that you are passing `past_key_values` as a tuple and this is deprecated and will be removed in v4.43. "
-                "Please use an appropriate `Cache` class (https://huggingface.co/docs/transformers/v4.41.3/en/internal/generation_utils#transformers.Cache)"
-            )
+        if use_cache and not isinstance(past_key_values, Cache):  # Ensure past_key_values is a Cache object
+            past_key_values = DynamicCache()
 
         # if cache_position is None:
         # TODO: currently ignore cache_position
