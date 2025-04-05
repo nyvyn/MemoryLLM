@@ -18,12 +18,7 @@ class NeuralMemory:
         # After this, the usage of MPlus is the same as MemoryLLM-8B, please check "How to use the model" below.
 
     def query(self, text, max_length=50):
-<<<<<<< HEAD
         inputs = self.tokenizer(text, return_tensors="pt", add_special_tokens=False).to(self.model.device)
-=======
-        inputs = self.tokenizer(text, return_tensors="pt", add_special_tokens=False).to(
-            self.model.device)
->>>>>>> 44b5e515798ee8d8674c5c1dbc1b1b2f19638d50
         outputs = self.model.generate(
             **inputs,
             max_length=max_length,
