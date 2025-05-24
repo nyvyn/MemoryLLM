@@ -18,6 +18,7 @@ import json
 import pandas as pd
 from tqdm import tqdm
 from functools import partial
+from MemoryLLM.memoryllm.util import calculate_exact_hit_accuracy
 
 
 
@@ -331,15 +332,6 @@ def run_qa(model, tokenizer, dataset, step=1):
     return middle_outputs, targets, contexts_middle, questions
 
 
-def calculate_exact_hit_accuracy(predictions, targets):
-
-    count = 0
-    hit = 0
-    for i in range(len(predictions)):
-        if targets[i].replace("</s>", "").strip() in predictions[i]:
-            hit += 1
-        count += 1
-    return hit/count
 
 if __name__ == "__main__":
 

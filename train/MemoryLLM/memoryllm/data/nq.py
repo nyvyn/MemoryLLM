@@ -112,7 +112,6 @@ class NQDataset(Dataset):
         self.questions = [self.questions[i] for i in indices]
         self.long_answers = [self.long_answers[i] for i in indices]
         self.short_answers = [self.short_answers[i] for i in indices]
-        print("Length of dataset:", len(self.questions))
 
         if num_unrelated_contexts > 0:
             self.unrelated_contexts = []
@@ -155,7 +154,6 @@ class NQDataset(Dataset):
         
         else:
             self.unrelated_contexts = []
-        print("Length of unrelated contexts:", len(self.unrelated_contexts))
         
         # truncate unrelated_contexts into less than 512 tokens
         new_unrelated_contexts = []

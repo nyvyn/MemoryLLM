@@ -90,7 +90,6 @@ class SQuADDataset(Dataset):
         if num is not None:
             indices = indices[:num]
         self.data = [self.data[i] for i in indices]
-        print("Length of squad dataset:", len(self.data))
 
         # truncate unrelated_contexts into less than 512 tokens
         new_unrelated_contexts = []
