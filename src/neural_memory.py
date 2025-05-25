@@ -9,12 +9,13 @@ class NeuralMemory:
         self.model = MPlus.from_pretrained(
             "YuWangX/mplus-8b",
             attn_implementation="sdpa",
-            torch_dtype=torch.bfloat16
+            torch_dtype=torch.float16
         )
         self.tokenizer = AutoTokenizer.from_pretrained("YuWangX/mplus-8b")
         device = torch.device("mps")
-        self.model = self.model.to(device)
+        self.model = self.model.to(torch.float16).to(device)
         self.model.put_ltm_to_numpy()
+        self.model.convert_memory_to_cpu()
         # After this, the usage of MPlus is the same as MemoryLLM-8B, please check "How to use the model" below.
 
     def query(self, text, max_length=50):
@@ -34,3 +35,4 @@ class NeuralMemory:
             self.tokenizer(ctx, return_tensors='pt', add_special_tokens=False).input_ids.to(self.model.device),
             update_memory=True
         )
+

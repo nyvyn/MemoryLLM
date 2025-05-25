@@ -1549,6 +1549,10 @@ class MemoryLLM(LlamaForCausalLM):
             if config.add_decoder_lora:
                 get_peft_model(self.model, peft_config, adapter_name="decoder_adapter")
 
+    def convert_memory_to_cpu(self):
+        """Move the memory tensor to CPU to reduce GPU memory usage."""
+        self.memory.data = self.memory.data.cpu()
+
 
     def inject_memory(self, context_ids, 
                         context_attention_mask=None,

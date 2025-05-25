@@ -1887,6 +1887,11 @@ class MPlus(LlamaForCausalLM):
         self.ltm_keys = ltm_keys
         self.ltm = ltm
 
+    def convert_memory_to_cpu(self):
+        """Move memory tensors and long-term memory to CPU."""
+        self.memory.data = self.memory.data.cpu()
+        self.put_ltm_to_numpy()
+
     def merge_cached_memory(self):
         self.update_ltm(self.cached_dropped_memories,
                         self.cached_dropped_memory_ages,

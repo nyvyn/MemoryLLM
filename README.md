@@ -57,9 +57,10 @@ from src.modeling_mplus import MPlus
 model = MPlus.from_pretrained("YuWangX/mplus-8b", attn_implementation="flash_attention_2", torch_dtype=torch.bfloat16)
 tokenizer = AutoTokenizer.from_pretrained("YuWangX/mplus-8b")
 model = model.to(torch.bfloat16)  # need to call it again to cast the `inv_freq` in rotary_emb to bfloat16 as well
-model.put_ltm_to_numpy()  # We include ltm as modules so that it can be uploaded to huggingface, but for inference we need to put ltm on CPU and cast ltm_ags to numpy. 
+model.put_ltm_to_numpy()  # We include ltm as modules so that it can be uploaded to huggingface, but for inference we need to put ltm on CPU and cast ltm_ags to numpy.
+model.convert_memory_to_cpu()  # optional: move short-term memory to CPU during inference
 model = model.cuda()
-# After this, the usage of MPlus is the same as MemoryLLM-8B, please check "How to use the model" below. 
+# After this, the usage of MPlus is the same as MemoryLLM-8B, please check "How to use the model" below.
 ```
 
 To load `MemoryLLM-8B` and `MemoryLLM-8B-chat`, please use the following code:

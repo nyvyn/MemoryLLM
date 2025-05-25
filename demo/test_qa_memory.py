@@ -344,9 +344,6 @@ if __name__ == "__main__":
     model = None
     tokenizer = None
 
-    if opt.put_memory_on_cpu:
-        model.convert_memory_to_cpu()
-
     original_nuc = opt.nuc
 
     for dataset in opt.datasets:
@@ -373,9 +370,10 @@ if __name__ == "__main__":
                     if model is None:
                         if not opt.split_model:
                             model = MemoryLLM.from_pretrained(opt.model).cuda()
-                            
                         else:
                             model = MemoryLLM.from_pretrained(opt.model, device_map='auto')
+                        if opt.put_memory_on_cpu:
+                            model.convert_memory_to_cpu()
                     
                     if tokenizer is None:
                         tokenizer = LlamaTokenizer.from_pretrained(opt.model)
@@ -462,6 +460,8 @@ if __name__ == "__main__":
                         model = MemoryLLM.from_pretrained(opt.model).cuda()
                     else:
                         model = MemoryLLM.from_pretrained(opt.model, device_map='auto')
+                    if opt.put_memory_on_cpu:
+                        model.convert_memory_to_cpu()
                 
                 model = model.to(torch.float16)
                 
