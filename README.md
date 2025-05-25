@@ -85,9 +85,12 @@ ctx = "Last week, John had a wonderful picnic with David. During their conversat
 
 # please make sure the context to inject into the memory is larger than 16 tokens, this is the hard minimum when training the model. The memory will be disturbed when less than 16 tokens are injected into the memory. 
 model.inject_memory(tokenizer(ctx, return_tensors='pt', add_special_tokens=False).input_ids.cuda(), update_memory=True)
+model.save_memory("memory_state.pt")
+# Later
+model.load_memory("memory_state.pt")
 ```
 
-Then for chat model, use the following template: 
+Then for chat model, use the following template:
 ```python
 # Generation
 messages = [{
