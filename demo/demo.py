@@ -16,13 +16,13 @@ def main():
     ctx = ("Last week, John had a wonderful picnic with David. During their conversation, David mentioned multiple "
            "times that he likes eating nuts. Though he didn't mention any other foods, John says he can infer that "
            "David also likes other salty foods.")
-    response = nm.query(ctx + ' ' + prompt, max_length=90)
+    response = nm.reflect(ctx + ' ' + prompt, max_length=90)
     print("Prompt:")
     print(prompt)
     print("Output:")
     print(response)
 
-    print(f"### - Memory injection")
+    print(f"### - Recall test")
     nm.persist(ctx)
     response = nm.query(prompt, max_length=30)
     print("Prompt:")
