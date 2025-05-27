@@ -40,7 +40,7 @@ class NeuralMemory:
             self,
             text: str,
             max_length: int = 50,
-            threshold: float = 0.7,
+            threshold: float = 0.8,
             beta: float = 1.0
     ) -> str:
         # 1) encode once
@@ -54,12 +54,12 @@ class NeuralMemory:
             loss = out.loss
             surprise = beta * (1.0 - torch.sigmoid(-loss)).item()
 
-            print(f"Surprise: {surprise:.2f} >= threshold: {threshold:.2f}")
             if surprise >= threshold:
-                print("Persisting...")
+                print(f"Persisting due to surprise: {surprise:.2f} >= threshold: {threshold:.2f}")
                 self.persist(text)
 
         # 3) generate reply
+        print("Generating response...")
         gen = self.model.generate(**enc,
                                   max_length=max_length,
                                   pad_token_id=self.tokenizer.eos_token_id)
