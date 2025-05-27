@@ -48,14 +48,11 @@ class NeuralMemory:
                              add_special_tokens=False).to(self.model.device)
         ids = enc["input_ids"]
 
-        # 2) forward-backward for gradient-norm surprise
-        self.model.zero_grad(set_to_none=True)
-        out = self.model(**enc, labels=ids, return_dict=True)
-        out.loss.backward()
-
+        # 2) single forward to get the CLM loss → surprise
         with torch.no_grad():
-            emb_grad = self.model.get_input_embeddings().weight.grad[ids]
-            surprise = beta * emb_grad.norm(dim=-1).mean().item()  # Titans’ momentary surprise
+            out = self.model(**enc, labels=ids, return_dict=True)
+            loss = out.loss
+            surprise = beta * (1.0 - torch.sigmoid(-loss)).item()
 
             print(f"Surprise: {surprise:.2f} >= threshold: {threshold:.2f}")
             if surprise >= threshold:
