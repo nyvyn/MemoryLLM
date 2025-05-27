@@ -37,8 +37,7 @@ class NeuralMemory:
         return self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:])
 
     def reflect(self, text: str, max_length = 50, threshold: float = 0.7) -> float:
-        """Measure how *surprising* ``user_input`` is and persist it when novelty is high.
-
+        """
         Evaluates the model's own likelihood of the observed input as an introspective signal.
         high loss indicates the model was uncertain about the user's message,
         so we store the input for later recall.
@@ -51,39 +50,41 @@ class NeuralMemory:
         Returns:
             The response to the query.
         """
-        # tokenize and keep the full BatchEncoding so we can pass it to generate()
+        # 1) tokenize once and move to device
         encoding = self.tokenizer(
             text,
             return_tensors="pt",
             add_special_tokens=False
         ).to(self.model.device)
-        inputs = encoding["input_ids"]
+        input_ids = encoding["input_ids"]
 
-        if inputs.shape[1] < 2:
-            return 0.0
-
+        # 2) single forward to get the loss via labels
         with torch.no_grad():
-            outputs = self.model(inputs[:, :-1], return_dict=True)
-            logits = outputs.logits
+            output = self.model(
+                **encoding,
+                labels=input_ids,
+                # huggingface will compute loss internally
+                return_dict=True
+            )
+            loss = output.loss
 
-        target = inputs[:, 1:]
-        loss = F.cross_entropy(
-            logits.reshape(-1, logits.size(-1)),
-            target.reshape(-1),
-            reduction="mean",
-        )
-        certainty = torch.sigmoid(-loss).item()
-        surprise = 1.0 - certainty
+        surprise = 1.0 - torch.sigmoid(-loss).item()
+        if surprise >= threshold:
+            self.persist(text)
 
         if surprise >= threshold:
             self.persist(text)
 
-        # now pass the batch‐encoding (or at least input_ids) as a mapping
-        outputs = self.model.generate(
-            input_ids=inputs,
+        # 3) single generate call for the reply
+        gen_ids = self.model.generate(
+            **encoding,
             attention_mask=encoding["attention_mask"],
             max_length=max_length,
-            pad_token_id=self.tokenizer.eos_token_id,
+            pad_token_id=self.tokenizer.eos_token_id
+        )
+        reply = self.tokenizer.decode(
+            gen_ids[0, input_ids.size(1):],
+            skip_special_tokens=True
         )
 
-        return self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:])
+        return reply
