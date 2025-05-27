@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from transformers import AutoTokenizer
 from src.modeling_mplus import MPlus
 
@@ -34,3 +35,39 @@ class NeuralMemory:
             self.tokenizer(ctx, return_tensors='pt', add_special_tokens=False).input_ids.to(self.model.device),
             update_memory=True
         )
+
+    def evaluate_and_update(self, user_input: str, response: str, threshold: float = 0.7) -> float:
+        """Measure how *surprising* ``user_input`` is and persist it when novelty is high.
+
+        Following the idea of Intuitor, we rely on the model's own likelihood of
+        the observed input as an introspective signal. A high loss indicates the
+        model was uncertain about the user's message, so we store the input for
+        later recall.
+
+        Args:
+            user_input: Prompt from the user.
+            response: Model generated response to ``user_input`` (unused).
+            threshold: Value between 0 and 1. Memory is updated when the
+                computed surprise is greater or equal to this value.
+
+        Returns:
+            The computed surprise score.
+        """
+
+        ids = self.tokenizer(user_input, return_tensors="pt", add_special_tokens=False).input_ids.to(self.model.device)
+        if ids.shape[1] < 2:
+            return 0.0
+
+        with torch.no_grad():
+            outputs = self.model(ids[:, :-1], return_dict=True)
+            logits = outputs.logits
+
+        target = ids[:, 1:]
+        loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), target.reshape(-1), reduction="mean")
+        certainty = torch.sigmoid(-loss).item()
+        surprise = 1.0 - certainty
+
+        if surprise >= threshold:
+            self.persist(user_input)
+
+        return surprise

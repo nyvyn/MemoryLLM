@@ -90,6 +90,18 @@ model.save_memory("memory_state.pt")
 model.load_memory("memory_state.pt")
 ```
 
+The helper class ``NeuralMemory`` can introspect conversations and persist only
+the surprising parts. After generating a response, call
+``evaluate_and_update`` with the user input and model response:
+
+```python
+nm = NeuralMemory()
+prompt = "Question: What fruits does David like?"
+response = nm.query(prompt)
+surprise = nm.evaluate_and_update(prompt, response, threshold=0.5)
+print(f"Surprise: {surprise:.2f}")
+```
+
 Then for chat model, use the following template:
 ```python
 # Generation
