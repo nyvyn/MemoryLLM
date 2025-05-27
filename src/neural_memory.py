@@ -51,8 +51,14 @@ class NeuralMemory:
         Returns:
             The response to the query.
         """
+        # tokenize and keep the full BatchEncoding so we can pass it to generate()
+        encoding = self.tokenizer(
+            text,
+            return_tensors="pt",
+            add_special_tokens=False
+        ).to(self.model.device)
+        inputs = encoding["input_ids"]
 
-        inputs = self.tokenizer(text, return_tensors="pt", add_special_tokens=False).input_ids.to(self.model.device)
         if inputs.shape[1] < 2:
             return 0.0
 
@@ -72,8 +78,9 @@ class NeuralMemory:
         if surprise >= threshold:
             self.persist(text)
 
+        # now pass the batch‐encoding (or at least input_ids) as a mapping
         outputs = self.model.generate(
-            **inputs,
+            input_ids=inputs,
             max_length=max_length,
             pad_token_id=self.tokenizer.eos_token_id,
         )
