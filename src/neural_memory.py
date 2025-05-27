@@ -78,7 +78,6 @@ class NeuralMemory:
         # 3) single generate call for the reply
         gen_ids = self.model.generate(
             **encoding,
-            attention_mask=encoding["attention_mask"],
             max_length=max_length,
             pad_token_id=self.tokenizer.eos_token_id
         )
