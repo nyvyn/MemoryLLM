@@ -36,54 +36,34 @@ class NeuralMemory:
         )
         return self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:])
 
-    def reflect(self, text: str, max_length = 50, threshold: float = 0.7) -> float:
-        """
-        Evaluates the model's own likelihood of the observed input as an introspective signal.
-        high loss indicates the model was uncertain about the user's message,
-        so we store the input for later recall.
+    def reflect(
+            self,
+            text: str,
+            max_length: int = 50,
+            threshold: float = 0.7,
+            beta: float = 1.0
+    ) -> str:
+        # 1) encode once
+        enc = self.tokenizer(text, return_tensors="pt",
+                             add_special_tokens=False).to(self.model.device)
+        ids = enc["input_ids"]
 
-        Args:
-            :param text: Prompt from the user.
-            :param max_length: Maximum length of the response.
-            :param threshold: Threshold for surprise.
+        # 2) forward-backward for gradient-norm surprise
+        self.model.zero_grad(set_to_none=True)
+        out = self.model(**enc, labels=ids, return_dict=True)
+        out.loss.backward()
 
-        Returns:
-            The response to the query.
-        """
-        # 1) tokenize once and move to device
-        encoding = self.tokenizer(
-            text,
-            return_tensors="pt",
-            add_special_tokens=False
-        ).to(self.model.device)
-        input_ids = encoding["input_ids"]
-
-        # 2) single forward to get the loss via labels
         with torch.no_grad():
-            output = self.model(
-                **encoding,
-                labels=input_ids,
-                # huggingface will compute loss internally
-                return_dict=True
-            )
-            loss = output.loss
+            emb_grad = self.model.get_input_embeddings().weight.grad[ids]
+            surprise = beta * emb_grad.norm(dim=-1).mean().item()  # Titans’ momentary surprise
 
-        surprise = 1.0 - torch.sigmoid(-loss).item()
-        if surprise >= threshold:
-            self.persist(text)
+            print(f"Surprise: {surprise:.2f} >= threshold: {threshold:.2f}")
+            if surprise >= threshold:
+                print("Persisting...")
+                self.persist(text)
 
-        if surprise >= threshold:
-            self.persist(text)
-
-        # 3) single generate call for the reply
-        gen_ids = self.model.generate(
-            **encoding,
-            max_length=max_length,
-            pad_token_id=self.tokenizer.eos_token_id
-        )
-        reply = self.tokenizer.decode(
-            gen_ids[0, input_ids.size(1):],
-            skip_special_tokens=True
-        )
-
-        return reply
+        # 3) generate reply
+        gen = self.model.generate(**enc,
+                                  max_length=max_length,
+                                  pad_token_id=self.tokenizer.eos_token_id)
+        return self.tokenizer.decode(gen[0, ids.size(1):], skip_special_tokens=True)
