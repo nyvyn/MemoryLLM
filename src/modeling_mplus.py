@@ -1895,6 +1895,75 @@ class MPlus(LlamaForCausalLM):
         self.update_step = 0
         self.cached_dropped_memories, self.cached_dropped_memory_ages = None, None
 
+    def save_memory(self, path: str):
+        """Save memory related tensors and arrays to ``path``."""
+
+        def _to_cpu(x):
+            if isinstance(x, torch.Tensor):
+                return x.detach().cpu()
+            return x
+
+        state = {
+            "memory": _to_cpu(self.memory.data),
+            "ltm": [_to_cpu(t) for t in self.ltm],
+            "ltm_keys": [_to_cpu(t) for t in self.ltm_keys],
+            "ltm_recall_frequencies": [_to_cpu(t) for t in self.ltm_recall_frequencies],
+            "ltm_ages": [_to_cpu(t) for t in self.ltm_ages],
+            "memory_ages": self.memory_ages,
+            "cached_dropped_memories": _to_cpu(self.cached_dropped_memories) if self.cached_dropped_memories is not None else None,
+            "cached_dropped_memory_ages": self.cached_dropped_memory_ages,
+            "cached_dropped_keys": _to_cpu(self.cached_dropped_keys) if self.cached_dropped_keys is not None else None,
+            "put_cached_dropped_memory_on_cpu": self.put_cached_dropped_memory_on_cpu,
+            "update_step": self.update_step,
+        }
+
+        torch.save(state, path)
+
+    def load_memory(self, path: str):
+        """Load memory tensors and arrays saved by :meth:`save_memory`."""
+
+        state = torch.load(path, map_location="cpu")
+
+        device = self.memory.device
+
+        def _to_tensor(x, dtype=None):
+            if isinstance(x, torch.Tensor):
+                return x.to(device=device, dtype=dtype)
+            return torch.tensor(x, device=device, dtype=dtype)
+
+        self.memory.data = _to_tensor(state["memory"], dtype=self.memory.dtype)
+        self.memory.requires_grad = False
+
+        self.ltm = nn.ParameterList([nn.Parameter(_to_tensor(t, dtype=self.memory.dtype)) for t in state["ltm"]])
+        self.ltm_keys = nn.ParameterList([nn.Parameter(_to_tensor(t)) for t in state["ltm_keys"]])
+        self.ltm_recall_frequencies = nn.ParameterList([nn.Parameter(_to_tensor(t, dtype=torch.float)) for t in state["ltm_recall_frequencies"]])
+        self.ltm_ages = nn.ParameterList([nn.Parameter(_to_tensor(t, dtype=torch.float)) for t in state["ltm_ages"]])
+
+        self.memory_ages = state.get("memory_ages", self.memory_ages)
+
+        self.put_cached_dropped_memory_on_cpu = state.get("put_cached_dropped_memory_on_cpu", True)
+        if state.get("cached_dropped_memories") is not None:
+            tensor = state["cached_dropped_memories"]
+            if self.put_cached_dropped_memory_on_cpu:
+                self.cached_dropped_memories = tensor
+            else:
+                self.cached_dropped_memories = tensor.to(device)
+        else:
+            self.cached_dropped_memories = None
+
+        self.cached_dropped_memory_ages = state.get("cached_dropped_memory_ages")
+
+        if state.get("cached_dropped_keys") is not None:
+            tensor = state["cached_dropped_keys"]
+            if self.put_cached_dropped_memory_on_cpu:
+                self.cached_dropped_keys = tensor
+            else:
+                self.cached_dropped_keys = tensor.to(device)
+        else:
+            self.cached_dropped_keys = None
+
+        self.update_step = state.get("update_step", 0)
+
     def base_update_memory_with_delta_memory(self, delta_memory, 
                                         cached_contexts_indicators=None, 
                                         is_ltm=False,
