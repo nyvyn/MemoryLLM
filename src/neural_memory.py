@@ -18,15 +18,6 @@ class NeuralMemory:
         self.model.put_ltm_to_numpy()
         # After this, the usage of MPlus is the same as MemoryLLM-8B, please check "How to use the model" below.
 
-    def query(self, text, max_length=50):
-        inputs = self.tokenizer(text, return_tensors="pt", add_special_tokens=False).to(self.model.device)
-        outputs = self.model.generate(
-            **inputs,
-            max_length=max_length,
-            pad_token_id=self.tokenizer.eos_token_id,
-        )
-        return self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:])
-
     def persist(self, ctx):
         # please make sure the context to inject into the memory is larger than 16 tokens,
         # this is the hard minimum when training the model.
@@ -36,38 +27,40 @@ class NeuralMemory:
             update_memory=True
         )
 
-    def evaluate_and_update(self, user_input: str, response: str, threshold: float = 0.7) -> float:
-        """Measure how *surprising* ``user_input`` is and persist it when novelty is high.
+    def query(self, text, max_length=50):
+        inputs = self.tokenizer(text, return_tensors="pt", add_special_tokens=False).to(self.model.device)
+        outputs = self.model.generate(
+            **inputs,
+            max_length=max_length,
+            pad_token_id=self.tokenizer.eos_token_id,
+        )
+        return self.tokenizer.decode(outputs[0][inputs['input_ids'].shape[1]:])
 
-        Following the idea of Intuitor, we rely on the model's own likelihood of
-        the observed input as an introspective signal. A high loss indicates the
-        model was uncertain about the user's message, so we store the input for
-        later recall.
+    def reflect(
+            self,
+            text: str,
+            max_length: int = 50,
+            threshold: float = 0.8,
+            beta: float = 1.0
+    ) -> str:
+        # 1) encode once
+        enc = self.tokenizer(text, return_tensors="pt",
+                             add_special_tokens=False).to(self.model.device)
+        ids = enc["input_ids"]
 
-        Args:
-            user_input: Prompt from the user.
-            response: Model generated response to ``user_input`` (unused).
-            threshold: Value between 0 and 1. Memory is updated when the
-                computed surprise is greater or equal to this value.
-
-        Returns:
-            The computed surprise score.
-        """
-
-        ids = self.tokenizer(user_input, return_tensors="pt", add_special_tokens=False).input_ids.to(self.model.device)
-        if ids.shape[1] < 2:
-            return 0.0
-
+        # 2) single forward to get the CLM loss → surprise
         with torch.no_grad():
-            outputs = self.model(ids[:, :-1], return_dict=True)
-            logits = outputs.logits
+            out = self.model(**enc, labels=ids, return_dict=True)
+            loss = out.loss
+            surprise = beta * (1.0 - torch.sigmoid(-loss)).item()
 
-        target = ids[:, 1:]
-        loss = F.cross_entropy(logits.reshape(-1, logits.size(-1)), target.reshape(-1), reduction="mean")
-        certainty = torch.sigmoid(-loss).item()
-        surprise = 1.0 - certainty
+            if surprise >= threshold:
+                print(f"Persisting due to surprise: {surprise:.2f} >= threshold: {threshold:.2f}")
+                self.persist(text)
 
-        if surprise >= threshold:
-            self.persist(user_input)
-
-        return surprise
+        # 3) generate reply
+        print("Generating response...")
+        gen = self.model.generate(**enc,
+                                  max_length=max_length,
+                                  pad_token_id=self.tokenizer.eos_token_id)
+        return self.tokenizer.decode(gen[0, ids.size(1):], skip_special_tokens=True)
