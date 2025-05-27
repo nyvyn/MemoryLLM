@@ -81,6 +81,7 @@ class NeuralMemory:
         # now pass the batch‐encoding (or at least input_ids) as a mapping
         outputs = self.model.generate(
             input_ids=inputs,
+            attention_mask=encoding["attention_mask"],
             max_length=max_length,
             pad_token_id=self.tokenizer.eos_token_id,
         )
